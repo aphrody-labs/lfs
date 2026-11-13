@@ -24,17 +24,18 @@ docker run -d --name "$NAME" --cpus "$JOBS" -e JOBS="$JOBS" \
 
 half=$(( $(nproc) / 2 ))
 paused=0
+gt() { awk -v a="$1" -v b="$2" 'BEGIN { exit !(a > b) }'; }
 while [ "$(docker inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null)" = true ]; do
   sleep 20
   load=$(cut -d' ' -f1 /proc/loadavg)
   if [ $paused = 0 ]; then
     ours=$(docker stats --no-stream --format '{{.CPUPerc}}' "$NAME" | tr -d '%')
-    other=$(echo "$load - ${ours:-0} / 100" | bc -l)
-    if [ "$(echo "$other > $half" | bc)" = 1 ]; then
+    other=$(awk -v l="$load" -v o="${ours:-0}" 'BEGIN { print l - o / 100 }')
+    if gt "$other" "$half"; then
       docker pause "$NAME" > /dev/null; paused=1
       echo "$(date -u +%FT%TZ) pause load=$load ours=$ours%" | tee -a "$W/log/watchdog.log"
     fi
-  elif [ "$(echo "$load < $half" | bc)" = 1 ]; then
+  elif gt "$half" "$load"; then
     docker unpause "$NAME" > /dev/null; paused=0
     echo "$(date -u +%FT%TZ) resume load=$load" | tee -a "$W/log/watchdog.log"
   fi
