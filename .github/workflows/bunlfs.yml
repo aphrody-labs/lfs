@@ -47,7 +47,7 @@ jobs:
           docker run --rm $KVM -e ACCEL=$A -v "$PWD/work:/work" -v "$PWD:/lfs:ro" bunlfs-host:arch \
             sh /lfs/bun/scripts/boot-compare.sh | tee work/log/boot-compare.tsv
           echo "accel=$A" >> work/log/boot-compare.tsv
-          rm -rf work/cmp
+          sudo rm -rf work/cmp # created by root inside the container
       - name: Image comparison (size, libc, packaged kernel)
         run: BUNLFS_WORK=$PWD/work sh bun/scripts/compare.sh | tee work/log/compare.tsv
       - if: always()
