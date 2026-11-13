@@ -1,12 +1,14 @@
 #!/bin/sh
-# Host side (prd): build the Arch image, run build.sh/boot.sh in a CPU-capped container,
-# and pause it while the rest of the host is busy (prd serves production backends).
 # Usage: prd.sh <build.sh args | boot [mode] | compare>
 # Pause rule: load1 minus our own running CPUs > nproc/2 -> docker pause; resume when load1 < nproc/2.
 set -eu
 BUNDIR=$(cd "$(dirname "$0")/.." && pwd)
 W=${BUNLFS_WORK:-/srv/bunlfs/work}
-JOBS=${JOBS:-4}
+JOBS=${JOBS:-2}
+# Fleet rule (2026-11-13): one heavy job at a time on prd, under flock, only below half the cores.
+exec 9>/var/lock/aphrody-heavy.lock
+flock -n 9 || { echo "another heavy job holds /var/lock/aphrody-heavy.lock"; exit 75; }
+awk -v l="$(cut -d" " -f1 /proc/loadavg)" -v h="$(( $(nproc) / 2 ))" "BEGIN { exit !(l < h) }" || { echo "prd load above half the cores, not starting"; exit 75; }
 IMG=bunlfs-host:arch
 NAME=bunlfs-$$
 mkdir -p "$W/log"

@@ -1,0 +1,68 @@
+# bun-LFS build and proofs on GitHub-hosted runners (bun/BOOK.md). Nothing is built on the fleet.
+# The build itself runs in the Arch container of bun/Containerfile; the VM is only the Docker host.
+name: bun-LFS
+on:
+  push:
+    branches: [trunk]
+    paths: ["bun/**", ".github/workflows/bunlfs.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v7
+      - name: Free disk
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL && df -h /
+      - name: KVM access
+        run: |
+          if [ -e /dev/kvm ]; then
+            echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm.rules
+            sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+            echo "KVM=--device=/dev/kvm" >> "$GITHUB_ENV"
+          fi
+          nproc; lscpu | grep -E 'Model name|Flags' | cut -c1-200; ls -l /dev/kvm || true
+      - name: Host image
+        run: |
+          docker build -q -t bunlfs-host:arch -f bun/Containerfile bun
+          mkdir -p work/log
+          { docker image inspect bunlfs-host:arch --format '{{.Id}}'
+            docker run --rm bunlfs-host:arch pacman -Q clang lld llvm rust rust-bindgen gcc glibc qemu-system-x86; } | tee work/log/host-image.txt
+      - name: Build (fetch kernel glibc uutils preinit rootfs image)
+        run: |
+          docker run --rm -e JOBS=$(nproc) -e LFS_REV=${GITHUB_SHA::9} -v "$PWD/work:/work" -v "$PWD:/lfs:ro" \
+            bunlfs-host:arch sh /lfs/bun/scripts/build.sh all
+      - name: QEMU boot, bun as PID 1 (TCG, then KVM when available)
+        run: |
+          run() { docker run --rm $2 -e ACCEL=$1 -v "$PWD/work:/work" -v "$PWD:/lfs:ro" bunlfs-host:arch sh /lfs/bun/scripts/boot.sh $3; }
+          run tcg "" bun && cp work/log/qemu-bun.log work/log/qemu-bun-tcg.log
+          run tcg "" preinit && cp work/log/qemu-preinit.log work/log/qemu-preinit-tcg.log
+          if [ -n "${KVM:-}" ]; then run kvm "$KVM" bun && cp work/log/qemu-bun.log work/log/qemu-bun-kvm.log; fi
+      - name: Boot-time comparison (official cloud images, same QEMU settings)
+        run: |
+          A=tcg; [ -n "${KVM:-}" ] && A=kvm
+          docker run --rm $KVM -e ACCEL=$A -v "$PWD/work:/work" -v "$PWD:/lfs:ro" bunlfs-host:arch \
+            sh /lfs/bun/scripts/boot-compare.sh | tee work/log/boot-compare.tsv
+          echo "accel=$A" >> work/log/boot-compare.tsv
+          rm -rf work/cmp
+      - name: Image comparison (size, libc, packaged kernel)
+        run: BUNLFS_WORK=$PWD/work sh bun/scripts/compare.sh | tee work/log/compare.tsv
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: bunlfs-logs
+          path: |
+            work/log
+            work/out/SHA256SUMS
+            work/out/*.txt
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: bunlfs-images
+          path: |
+            work/out/bzImage
+            work/out/bunlfs-rootfs.tar.gz
+            work/out/kernel.config
+          compression-level: 0

@@ -35,7 +35,7 @@ for d in ${*:-arch debian ubuntu fedora alpine}; do
   echo "$sum  $f" | "${algo}sum" -c - > /dev/null 2>&1 || { printf '%s\tchecksum-failed\t-\t%s\n' "$d" "$f"; continue; }
   qemu-img create -q -f qcow2 -F qcow2 -b "$D/$f" "/tmp/$d.qcow2"
   t0=$(date +%s.%N)
-  timeout 900 nice -n 19 qemu-system-x86_64 -machine q35 -accel tcg -cpu max -smp 2 -m 2048 \
+  timeout 900 nice -n 19 qemu-system-x86_64 -machine q35 -accel "${ACCEL:-tcg}" -cpu max -smp 2 -m 2048 \
     -drive file="/tmp/$d.qcow2",if=virtio -drive file="$D/seed.img",if=virtio,format=raw \
     -nographic -serial mon:stdio -no-reboot </dev/null 2>&1 |
     while IFS= read -r l; do

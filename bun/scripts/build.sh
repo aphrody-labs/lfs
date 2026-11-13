@@ -17,7 +17,7 @@ W=/work
 BUNDIR=$(cd "$(dirname "$0")/.." && pwd)
 SRC=$W/src OUT=$W/out LOG=$W/log ROOT=$W/rootfs
 mkdir -p "$SRC" "$OUT" "$LOG"
-N="nice -n 19"
+N="nice -n 19 ionice -c 3"
 
 stage_fetch() {
   cd "$SRC"
@@ -107,7 +107,7 @@ NAME="bun-LFS"
 ID=bunlfs
 ID_LIKE=lfs
 VERSION_ID=0.1
-PRETTY_NAME="bun-LFS 0.1 (LFS $(sed -n 's/.*ENTITY version *"\(.*\)".*/\1/p' "$BUNDIR/../general.ent" | head -1) fork, Linux $LINUX_VERSION, glibc $GLIBC_VERSION, bun $BUN_VERSION)"
+PRETTY_NAME="bun-LFS 0.1 (LFS trunk fork ${LFS_REV:-unknown}, Linux $LINUX_VERSION, glibc $GLIBC_VERSION, bun $BUN_VERSION)"
 HOME_URL="https://github.com/aphrody-labs/lfs"
 EOF
   printf 'root:x:0:0:root:/root:/usr/bin/bunsh\n' > "$ROOT/etc/passwd"
