@@ -16,6 +16,7 @@ docker run --rm "$IMG" sh -c 'pacman -Q clang lld llvm rust rust-bindgen gcc gli
 
 case "${1:-all}" in
   boot) CMD="sh /lfs/bun/scripts/boot.sh ${2:-bun}" ;;
+  boot-compare) shift; CMD="sh /lfs/bun/scripts/boot-compare.sh $* > /work/log/boot-compare.tsv" ;;
   *) CMD="sh /lfs/bun/scripts/build.sh $*" ;;
 esac
 
