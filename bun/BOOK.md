@@ -24,7 +24,7 @@ maintained", lfs homepage, 2026-11-13); this variant uses neither init system.
 
 | LFS | bun-LFS | Why |
 |---|---|---|
-| Ch. 2-4 host, partitions, user | Arch container on prd (`Containerfile`), raw ext4 image made with `mkfs.ext4 -d` | src rule: Arch/Alpine containers only; no loop mounts or root on the host |
+| Ch. 2-4 host, partitions, user | Arch container (`Containerfile`) on a GitHub-hosted runner, raw ext4 image made with `mkfs.ext4 -d` | src rule: Arch/Alpine containers only; no loop mounts or root on the host |
 | Ch. 5-7 cross toolchain, chroot | skipped: the container's clang/lld/rustc is the toolchain | LLVM is a native cross compiler (one binary, `--target`); the shared src LLVM toolchain (docs/llvm/UNIFIED-TOOLCHAIN.md) replaces it later |
 | 8.5 Glibc | same configure as LFS (`--disable-nscd libc_cv_slibdir=/usr/lib`), GCC | glibc 2.44 INSTALL requires "GCC 12.1 or newer" and documents no clang build; bun's official glibc build needs only libc/libm/libdl/libpthread/ld-linux (`readelf -d`) |
 | 8.x GNU coreutils, bash, grep, ... | uutils coreutils (static musl multicall) + Bun's built-in shell (`Bun.$`) | Rust, LLVM backend; no shell binary needed |
@@ -36,11 +36,13 @@ maintained", lfs homepage, 2026-11-13); this variant uses neither init system.
 ## 2. Build
 
 ```sh
-just lfs-build              # on prd: Arch container, nice -n 19, -j4, paused when prd load > nproc/2
-just lfs-boot               # QEMU serial boot, log in /srv/bunlfs/work/log/qemu-bun.log
+just lfs-build              # GitHub-hosted runner (.github/workflows/bunlfs.yml): Arch container, -j$(nproc)
+just lfs-logs               # QEMU serial logs, boot-time and image comparisons -> docs/lfs/logs
 just lfs-wsl                # Windows: wsl --import bunlfs + bun --version + proof.ts
-just lfs-compare            # Arch/Debian/Ubuntu/NixOS/Alpine/Fedora comparison
 ```
+
+`scripts/prd.sh` is a fallback for prd only: fleet heavy-job lock (`flock /var/lock/aphrody-heavy.lock`),
+refuses to start above half the cores, nice 19, ionice 3, `-j2`, pauses the container when prd gets busy.
 
 Stages (`scripts/build.sh`): `fetch` (checksums: kernel.org sha256sums, LFS md5, bun SHASUMS256),
 `kernel`, `glibc`, `uutils`, `preinit`, `rootfs`, `image`. Outputs in `/work/out`: `bzImage`,
@@ -76,4 +78,4 @@ Install into `/opt/<name>` from verified upstream archives; each one is a separa
 - Native bun (AOT, LTO, all features) from the bun-native agent replaces `/usr/bin/bun`; bun-LFS is its boot test bed.
 - Kernel and userspace with the shared src LLVM toolchain (same LLVM for clang and rustc, cross-language LTO), glibc replaced by LLVM libc or musl once bun runs on it without libstdc++.
 - Chromium (fr1 only, docs/chromium), agentic stack (MCP, ACP, A2A in packages/ai-os), Rust for Linux drivers beyond the samples.
-- Bootloader (UKI + EFI stub), real hardware, KVM timing (prd has no /dev/kvm).
+- Bootloader (UKI + EFI stub), real hardware.

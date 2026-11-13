@@ -65,7 +65,7 @@ stage_glibc() {
 stage_uutils() {
   # uutils coreutils (Rust, LLVM backend), static musl multicall binary: no runtime dependency.
   cd "$SRC/uutils"
-  $N cargo build --release --locked -j "$JOBS" --target x86_64-unknown-linux-musl --features unix
+  $N cargo build --release --locked -j "$JOBS" --target x86_64-unknown-linux-musl --no-default-features --features feat_os_unix_musl
   cp target/x86_64-unknown-linux-musl/release/coreutils "$OUT/coreutils"
   rustc -vV > "$OUT/uutils-toolchain.txt"
 }
@@ -95,7 +95,7 @@ stage_rootfs() {
   install -m755 "$BUNDIR/init/init.ts" "$ROOT/usr/lib/bunlfs/init.ts"
   install -m644 "$BUNDIR/proof/proof.ts" "$ROOT/usr/lib/bunlfs/proof.ts"
   install -m755 "$OUT/preinit" "$ROOT/usr/lib/bunlfs/preinit"
-  ln -s ../lib/bunlfs/init.ts "$ROOT/usr/sbin/init"
+  ln -s ../lib/bunlfs/preinit "$ROOT/usr/sbin/init" # bun 1.4.4 aborts as PID 1 before /proc is mounted (docs/lfs/BUN-LFS.md)
   # uutils multicall + one symlink per utility.
   install -m755 "$OUT/coreutils" "$ROOT/usr/bin/coreutils"
   for u in $("$OUT/coreutils" --list); do
@@ -129,9 +129,11 @@ stage_image() {
   (cd "$OUT" && sha256sum bzImage bunlfs.raw bunlfs-rootfs.tar.gz > SHA256SUMS)
 }
 
-run() { s=$1; echo "== $s $(date -u +%FT%TZ)"; "stage_$s" > "$LOG/$s.log" 2>&1 || { tail -40 "$LOG/$s.log"; exit 1; }; echo "== $s ok $(date -u +%FT%TZ)"; }
+# Each stage runs in its own `sh -e` process: inside `f || ...` POSIX shells ignore set -e.
+run() { s=$1; echo "== $s $(date -u +%FT%TZ)"; sh -eu "$0" __stage "$s" > "$LOG/$s.log" 2>&1 || { tail -40 "$LOG/$s.log"; exit 1; }; echo "== $s ok $(date -u +%FT%TZ)"; }
 
 case "${1:-all}" in
+  __stage) "stage_$2" ;;
   all) for s in fetch kernel glibc uutils preinit rootfs image; do run $s; done ;;
   *) for s in "$@"; do run "$s"; done ;;
 esac

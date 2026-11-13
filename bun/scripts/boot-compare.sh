@@ -34,16 +34,16 @@ for d in ${*:-arch debian ubuntu fedora alpine}; do
   sum=$(curl -fsSL "$sums" | grep -E "[ (*]$f\)?( |\$)|^[0-9a-f]+\$" | grep -oE '[0-9a-f]{64,128}' | head -1)
   echo "$sum  $f" | "${algo}sum" -c - > /dev/null 2>&1 || { printf '%s\tchecksum-failed\t-\t%s\n' "$d" "$f"; continue; }
   qemu-img create -q -f qcow2 -F qcow2 -b "$D/$f" "/tmp/$d.qcow2"
-  t0=$(date +%s.%N)
+  t0=$(perl -MTime::HiRes=time -e 'printf "%.6f", time')
+  # The login prompt has no trailing newline: records end on '\n' or ':', each one timestamped.
   timeout 900 nice -n 19 qemu-system-x86_64 -machine q35 -accel "${ACCEL:-tcg}" -cpu max -smp 2 -m 2048 \
     -drive file="/tmp/$d.qcow2",if=virtio -drive file="$D/seed.img",if=virtio,format=raw \
     -nographic -serial mon:stdio -no-reboot </dev/null 2>&1 |
-    while IFS= read -r l; do
-      t=$(awk -v a="$(date +%s.%N)" -v b="$t0" 'BEGIN { printf "%.3f", a - b }')
-      printf '%s %s\n' "$t" "$l"
-      case $l in *"login:"*) pkill -f "file=/tmp/$d.qcow2" ;; esac
-    done > "$LOG/boot-$d.log"
-  s=$(grep -m1 "login:" "$LOG/boot-$d.log" | cut -d' ' -f1)
+    perl -MTime::HiRes=time -e '$| = 1; my ($t0, $img) = @ARGV; @ARGV = (); my $buf = "";
+      while (sysread(STDIN, my $c, 1)) { $buf .= $c; next unless $c eq "\n" || $buf =~ /login:\z/;
+        chomp $buf; printf "%.3f %s\n", time - $t0, $buf;
+        if ($buf =~ /login:\z/) { system("pkill", "-f", "file=$img"); } $buf = ""; }' "$t0" "/tmp/$d.qcow2" > "$LOG/boot-$d.log"
+  s=$(grep -m1 "login:$" "$LOG/boot-$d.log" | cut -d' ' -f1)
   printf '%s\t%s\tlogin:\t%s\n' "$d" "${s:-timeout}" "$f"
   rm -f "/tmp/$d.qcow2"
 done

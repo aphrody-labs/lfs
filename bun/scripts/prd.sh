@@ -1,4 +1,6 @@
 #!/bin/sh
+# Fallback host path (prd), not the default: the build runs on GitHub-hosted runners
+# (.github/workflows/bunlfs.yml). On prd: CPU-capped container, paused while prd is busy.
 # Usage: prd.sh <build.sh args | boot [mode] | compare>
 # Pause rule: load1 minus our own running CPUs > nproc/2 -> docker pause; resume when load1 < nproc/2.
 set -eu

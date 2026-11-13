@@ -35,7 +35,7 @@ export async function proof(): Promise<Record<string, string>> {
   };
   libc.close();
   // uutils coreutils through Bun's built-in shell (no /bin/sh in this system).
-  facts.uutils = (await Bun.$`ls --version`.nothrow().text()).split("\n")[0];
+  facts.uutils = (await Bun.$`/usr/bin/ls --version`.nothrow().text()).split("\n")[0]; // full path: `ls` alone is a Bun shell builtin
   facts.uname = (await Bun.$`uname -srm`.nothrow().text()).trim();
   facts.sha256_of_hello = new Bun.CryptoHasher("sha256").update("hello from bun-LFS").digest("hex");
   const t = performance.now();

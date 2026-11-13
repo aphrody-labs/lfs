@@ -34,12 +34,13 @@ jobs:
         run: |
           docker run --rm -e JOBS=$(nproc) -e LFS_REV=${GITHUB_SHA::9} -v "$PWD/work:/work" -v "$PWD:/lfs:ro" \
             bunlfs-host:arch sh /lfs/bun/scripts/build.sh all
-      - name: QEMU boot, bun as PID 1 (TCG, then KVM when available)
+      - name: QEMU boot (preinit then bun; TCG, then KVM when available)
         run: |
           run() { docker run --rm $2 -e ACCEL=$1 -v "$PWD/work:/work" -v "$PWD:/lfs:ro" bunlfs-host:arch sh /lfs/bun/scripts/boot.sh $3; }
-          run tcg "" bun && cp work/log/qemu-bun.log work/log/qemu-bun-tcg.log
-          run tcg "" preinit && cp work/log/qemu-preinit.log work/log/qemu-preinit-tcg.log
-          if [ -n "${KVM:-}" ]; then run kvm "$KVM" bun && cp work/log/qemu-bun.log work/log/qemu-bun-kvm.log; fi
+          # preinit (default /usr/sbin/init) must pass; bun directly as PID 1 is recorded, aborts on bun 1.4.4
+          run tcg "" preinit; cp work/log/qemu-preinit.log work/log/qemu-preinit-tcg.log
+          run tcg "" bun || echo "bun as direct PID 1 failed (expected on bun 1.4.4)"; cp work/log/qemu-bun.log work/log/qemu-bun-tcg.log
+          if [ -n "${KVM:-}" ]; then run kvm "$KVM" preinit; cp work/log/qemu-preinit.log work/log/qemu-preinit-kvm.log; fi
       - name: Boot-time comparison (official cloud images, same QEMU settings)
         run: |
           A=tcg; [ -n "${KVM:-}" ] && A=kvm
