@@ -1,0 +1,18 @@
+# bun-LFS kernel fragment, merged over x86_64_defconfig + kvm_guest.config.
+# Rust for Linux: CONFIG_RUST needs rustc + bindgen + rust-src (Documentation/rust/quick-start.rst).
+CONFIG_RUST=y
+CONFIG_SAMPLES=y
+CONFIG_SAMPLES_RUST=y
+CONFIG_SAMPLE_RUST_MINIMAL=y
+CONFIG_SAMPLE_RUST_PRINT=y
+# Boot straight from a raw virtio disk, no initramfs, no modules needed.
+CONFIG_DEVTMPFS=y
+CONFIG_DEVTMPFS_MOUNT=y
+CONFIG_VIRTIO_PCI=y
+CONFIG_VIRTIO_BLK=y
+CONFIG_EXT4_FS=y
+CONFIG_SERIAL_8250=y
+CONFIG_SERIAL_8250_CONSOLE=y
+CONFIG_BINFMT_SCRIPT=y
+CONFIG_PRINTK_TIME=y
+CONFIG_LOCALVERSION="-bunlfs"

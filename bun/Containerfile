@@ -1,0 +1,10 @@
+# bun-LFS build host: Arch Linux (src rule: never Debian/Ubuntu as a container base).
+# Replaces LFS chapters 5-7 (temporary cross toolchain): the host toolchain is Arch's
+# clang/lld/llvm + rustc (LLVM backend) + bindgen for Rust for Linux, and GCC only for glibc.
+FROM docker.io/library/archlinux:latest
+RUN pacman -Syu --noconfirm --needed \
+      base-devel clang lld llvm rust rust-src rust-musl rust-bindgen \
+      bc cpio xz zstd python perl bison flex gawk texinfo libelf pahole \
+      e2fsprogs qemu-system-x86 qemu-img unzip git curl \
+ && pacman -Scc --noconfirm
+WORKDIR /work

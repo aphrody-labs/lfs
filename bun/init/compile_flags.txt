@@ -1,0 +1,5 @@
+--target=x86_64-unknown-linux-gnu
+-ffreestanding
+-nostdlib
+-std=c23
+-O2
